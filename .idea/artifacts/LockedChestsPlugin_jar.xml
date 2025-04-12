@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="LockedChestsPlugin:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/LockedChestsPlugin_jar</output-path>
+    <root id="archive" name="LockedChestsPlugin.jar">
+      <element id="module-output" name="LockedChestsPlugin" />
+    </root>
+  </artifact>
+</component>

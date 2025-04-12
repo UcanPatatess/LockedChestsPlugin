@@ -1,0 +1,14 @@
+name: LockedChestsPlugin
+version: '1.0'
+main: jonyboylovespie.lockedchestplugin.lockedChestsPlugin.LockedChestsPlugin
+api-version: '1.21'
+commands:
+  trust:
+    description: Trust a player with a locked chest.
+    usage: /trust <player>
+  lockchest:
+    description: Lock or unlock a chest.
+    usage: /lockchest <add|remove>
+  lockinspect:
+    description: Inspect owner.
+    usage: /lockinspect
