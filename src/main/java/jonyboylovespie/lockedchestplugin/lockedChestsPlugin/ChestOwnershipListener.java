@@ -1,5 +1,6 @@
 package jonyboylovespie.lockedchestplugin.lockedChestsPlugin;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.Block;
@@ -15,6 +16,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -138,7 +140,9 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
     @EventHandler
     public void onInventoryMoveItem(InventoryMoveItemEvent event)
     {
-        Block sourceBlock = event.getSource().getLocation().getBlock();
+        Location location = event.getSource().getLocation();
+        if (location == null) return;
+        Block sourceBlock = location.getBlock();
         if (sourceBlock.getType() != Material.CHEST) return;
         Chest chest = (Chest) sourceBlock.getState();
         if (getOwner(chest) != null)
