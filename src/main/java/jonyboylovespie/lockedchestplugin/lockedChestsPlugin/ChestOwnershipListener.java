@@ -17,6 +17,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -73,7 +75,8 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         List<String> trusted = getTrustedPlayers(chest);
         if (trusted == null)
         {
-            trusted = Collections.singletonList(trustedPlayer);
+            trusted = new ArrayList<>();
+            trusted.add(trustedPlayer);
         }
         else
         {
