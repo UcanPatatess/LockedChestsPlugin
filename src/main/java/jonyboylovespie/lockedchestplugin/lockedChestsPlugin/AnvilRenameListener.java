@@ -21,13 +21,14 @@ public class AnvilRenameListener implements Listener
         if (meta == null) return;
         if (result.getType() == Material.IRON_NUGGET || result.getType() == Material.GOLD_NUGGET)
         {
+            CustomModelDataComponent component = meta.getCustomModelDataComponent();
+            List<String> strings = List.of();
             if (meta.getDisplayName().equalsIgnoreCase("key"))
             {
-                CustomModelDataComponent component = meta.getCustomModelDataComponent();
-                List<String> strings = List.of("key");
-                component.setStrings(strings);
-                meta.setCustomModelDataComponent(component);
+                strings = List.of("key");
             }
+            component.setStrings(strings);
+            meta.setCustomModelDataComponent(component);
             result.setItemMeta(meta);
             inventory.setItem(2, result);
         }
