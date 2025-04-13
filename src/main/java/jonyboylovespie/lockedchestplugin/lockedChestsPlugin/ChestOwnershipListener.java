@@ -1,8 +1,5 @@
 package jonyboylovespie.lockedchestplugin.lockedChestsPlugin;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
 import org.bukkit.block.DoubleChest;
@@ -51,12 +48,7 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
 
     private void setOwnership(Player owner, Chest chest)
     {
-        setOwnership(owner.getUniqueId(), chest);
-    }
-
-    private void setOwnership(UUID owner, Chest chest)
-    {
-        setOwnership(owner.toString(), chest);
+        setOwnership(owner.getUniqueId().toString(), chest);
     }
 
     private void setOwnership(String owner, Chest chest)
@@ -146,15 +138,15 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
             {
                 setOwnership(player, chest);
             }
-            player.sendMessage("Locking chest.");
+            player.sendMessage(ChatColor.GREEN + "Locking chest.");
             return;
         }
         if (!isPlayerOwner(player, chest))
         {
-            player.sendMessage("You cannot lock this chest, it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
+            player.sendMessage(ChatColor.RED + "You cannot lock this chest, it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
             return;
         }
-        player.sendMessage("This chest is already locked by you.");
+        player.sendMessage(ChatColor.RED + "This chest is already locked by you.");
     }
 
     private void handleRemoveLock(Player player, Chest chest)
@@ -162,12 +154,12 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         String ownerUUID = getOwner(chest);
         if (ownerUUID == null)
         {
-            player.sendMessage("This chest is not locked.");
+            player.sendMessage(ChatColor.RED + "This chest is not locked.");
             return;
         }
         if (!isPlayerOwner(player, chest) && !player.isOp())
         {
-            player.sendMessage("You cannot unlock this chest, it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
+            player.sendMessage(ChatColor.RED + "You cannot unlock this chest, it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
             return;
         }
         if (chest.getInventory().getHolder() instanceof DoubleChest doubleChest)
@@ -179,7 +171,7 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         {
             removeOwnership(chest);
         }
-        player.sendMessage("Unlocking chest.");
+        player.sendMessage(ChatColor.GREEN + "Unlocking chest.");
     }
 
     // Event handling methods
@@ -214,7 +206,7 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         UUID ownerUUID = UUID.fromString(owner);
         if (!ownerUUID.equals(player.getUniqueId()))
         {
-            player.sendMessage("You cannot break this chest, it is locked by " + Bukkit.getOfflinePlayer(ownerUUID).getName());
+            player.sendMessage(ChatColor.RED + "You cannot break this chest, it is locked by " + Bukkit.getOfflinePlayer(ownerUUID).getName());
             event.setCancelled(true);
         }
     }
@@ -256,7 +248,7 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         if (owner == null) return;
         if (canPlayerOpen(player, chest)) return;
         UUID ownerUUID = UUID.fromString(owner);
-        player.sendMessage("You cannot open this chest, it is locked by " + Bukkit.getOfflinePlayer(ownerUUID).getName());
+        player.sendMessage(ChatColor.RED + "You cannot open this chest, it is locked by " + Bukkit.getOfflinePlayer(ownerUUID).getName());
         event.setCancelled(true);
     }
 
@@ -279,18 +271,26 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         Player trustedPlayer = Bukkit.getPlayer(playerName);
         if (trustedPlayer == null)
         {
-            player.sendMessage(playerName + " is not online.");
+            player.sendMessage(ChatColor.RED + playerName + " is not online.");
             return false;
         }
         Block block = player.getTargetBlockExact(5);
         if (block == null || block.getType() != Material.CHEST)
         {
-            player.sendMessage("You must be looking at a chest.");
+            player.sendMessage(ChatColor.RED + "You must be looking at a chest.");
             return true;
         }
         Chest chest = (Chest) block.getState();
-        addTrustedPlayer(trustedPlayer, chest);
-        player.sendMessage("Trusted " + playerName + " to this chest.");
+        if (chest.getInventory().getHolder() instanceof DoubleChest doubleChest)
+        {
+            addTrustedPlayer(trustedPlayer, (Chest) doubleChest.getLeftSide());
+            addTrustedPlayer(trustedPlayer, (Chest) doubleChest.getRightSide());
+        }
+        else
+        {
+            addTrustedPlayer(trustedPlayer, chest);
+        }
+        player.sendMessage(ChatColor.GREEN + "Trusted " + playerName + " to this chest.");
         return true;
     }
 
@@ -300,13 +300,13 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         String action = args[0].toLowerCase();
         if (!action.equals("add") && !action.equals("remove"))
         {
-            player.sendMessage("Must proceed /lockchest with add or remove.");
+            player.sendMessage(ChatColor.RED + "Must proceed /lockchest with add or remove.");
             return false;
         }
         Block block = player.getTargetBlockExact(5);
         if (block == null || block.getType() != Material.CHEST)
         {
-            player.sendMessage("You must be looking at a chest.");
+            player.sendMessage(ChatColor.RED + "You must be looking at a chest.");
             return true;
         }
         Chest chest = (Chest) block.getState();
@@ -325,17 +325,31 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         Block block = player.getTargetBlockExact(5);
         if (block == null || block.getType() != Material.CHEST)
         {
-            player.sendMessage("You must be looking at a chest.");
+            player.sendMessage(ChatColor.RED + "You must be looking at a chest.");
             return true;
         }
         Chest chest = (Chest) block.getState();
         String owner = getOwner(chest);
         if (owner == null)
         {
-            player.sendMessage("This chest is not locked.");
+            player.sendMessage(ChatColor.RED + "This chest is not locked.");
             return true;
         }
-        player.sendMessage(owner);
+        Location chestLocation = chest.getLocation();
+        player.sendMessage(ChatColor.BLUE + "Chest info of chest at " + chestLocation.getX() + ", " + chestLocation.getY() + ", " + chestLocation.getZ() + " " + chestLocation.getWorld().getName() + ":");
+        player.sendMessage(ChatColor.YELLOW + "Owner:");
+        player.sendMessage(Bukkit.getOfflinePlayer(UUID.fromString(owner)).getName());
+        player.sendMessage(ChatColor.YELLOW + "Trusted players:");
+        List<String> trustedPlayers = getTrustedPlayers(chest);
+        if (trustedPlayers == null)
+        {
+            player.sendMessage("No trusted players.");
+            return true;
+        }
+        for (String trustedPlayer : trustedPlayers)
+        {
+            player.sendMessage(Bukkit.getOfflinePlayer(UUID.fromString(trustedPlayer)).getName());
+        }
         return true;
     }
 
