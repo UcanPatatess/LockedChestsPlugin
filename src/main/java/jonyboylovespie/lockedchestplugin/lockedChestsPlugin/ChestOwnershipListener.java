@@ -284,6 +284,27 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
             return true;
         }
         Chest chest = (Chest) block.getState();
+        String owner = getOwner(chest);
+        if (owner == null)
+        {
+            player.sendMessage(ChatColor.RED + "This chest is not locked.");
+            return true;
+        }
+        if (!isPlayerOwner(player, chest))
+        {
+            player.sendMessage(ChatColor.RED + "You cannot trust players to this chest, it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(owner)).getName());
+            return true;
+        }
+        if (isPlayerOwner(trustedPlayer, chest))
+        {
+            player.sendMessage(ChatColor.RED + "You cannot trust yourself to your own chest.");
+            return true;
+        }
+        if (isPlayerTrusted(trustedPlayer, chest))
+        {
+            player.sendMessage(ChatColor.RED + playerName + " is already trusted to this chest.");
+            return true;
+        }
         if (chest.getInventory().getHolder() instanceof DoubleChest doubleChest)
         {
             addTrustedPlayer(trustedPlayer, (Chest) doubleChest.getLeftSide());
