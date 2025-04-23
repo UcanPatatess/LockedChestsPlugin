@@ -3,6 +3,7 @@ import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
 import org.bukkit.block.DoubleChest;
+import org.bukkit.block.TileState;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -19,17 +20,16 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-public class ChestOwnershipListener implements Listener, CommandExecutor
+public class BlockSecurityListener implements Listener, CommandExecutor
 {
     private JavaPlugin plugin;
     private NamespacedKey ownerKey;
     private NamespacedKey trustedKey;
 
-    public ChestOwnershipListener(JavaPlugin plugin)
+    public BlockSecurityListener(JavaPlugin plugin)
     {
         this.plugin = plugin;
         ownerKey = new NamespacedKey(plugin, "owner");
@@ -41,38 +41,38 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
 
     // Data management methods
 
-    private void removeOwnership(Chest chest)
+    private void removeOwnership(TileState state)
     {
-        chest.getPersistentDataContainer().remove(ownerKey);
-        chest.getPersistentDataContainer().remove(trustedKey);
-        chest.update();
+        state.getPersistentDataContainer().remove(ownerKey);
+        state.getPersistentDataContainer().remove(trustedKey);
+        state.update();
     }
 
-    private void setOwnership(Player owner, Chest chest)
+    private void setOwnership(Player owner, TileState state)
     {
-        setOwnership(owner.getUniqueId().toString(), chest);
+        setOwnership(owner.getUniqueId().toString(), state);
     }
 
-    private void setOwnership(String owner, Chest chest)
+    private void setOwnership(String owner, TileState state)
     {
-        chest.getPersistentDataContainer().set(ownerKey, PersistentDataType.STRING, owner);
-        chest.update();
+        state.getPersistentDataContainer().set(ownerKey, PersistentDataType.STRING, owner);
+        state.update();
     }
 
-    private String getOwner(Chest chest)
+    private String getOwner(TileState state)
     {
-        return chest.getPersistentDataContainer().get(ownerKey, PersistentDataType.STRING);
+        return state.getPersistentDataContainer().get(ownerKey, PersistentDataType.STRING);
     }
 
-    private void addTrustedPlayer(Player trustedPlayer, Chest chest)
+    private void addTrustedPlayer(Player trustedPlayer, TileState state)
     {
-        addTrustedPlayer(trustedPlayer.getUniqueId().toString(), chest);
+        addTrustedPlayer(trustedPlayer.getUniqueId().toString(), state);
     }
 
-    private void addTrustedPlayer(String trustedPlayer, Chest chest)
+    private void addTrustedPlayer(String trustedPlayer, TileState state)
     {
         StringListDataType stringListType = new StringListDataType();
-        List<String> trusted = getTrustedPlayers(chest);
+        List<String> trusted = getTrustedPlayers(state);
         if (trusted == null)
         {
             trusted = new ArrayList<>();
@@ -82,33 +82,33 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         {
             trusted.add(trustedPlayer);
         }
-        chest.getPersistentDataContainer().set(trustedKey, stringListType, trusted);
-        chest.update();
+        state.getPersistentDataContainer().set(trustedKey, stringListType, trusted);
+        state.update();
     }
 
-    private List<String> getTrustedPlayers(Chest chest)
+    private List<String> getTrustedPlayers(TileState state)
     {
         StringListDataType stringListType = new StringListDataType();
-        return chest.getPersistentDataContainer().get(trustedKey, stringListType);
+        return state.getPersistentDataContainer().get(trustedKey, stringListType);
     }
 
     // Permission checking methods
 
-    private boolean canPlayerOpen(Player player, Chest chest)
+    private boolean canPlayerOpen(Player player, TileState state)
     {
-        return isPlayerOwner(player, chest) || isPlayerTrusted(player, chest);
+        return isPlayerOwner(player, state) || isPlayerTrusted(player, state);
     }
 
-    private boolean isPlayerTrusted(Player player, Chest chest)
+    private boolean isPlayerTrusted(Player player, TileState state)
     {
-        List<String> trustedPlayers = getTrustedPlayers(chest);
+        List<String> trustedPlayers = getTrustedPlayers(state);
         if (trustedPlayers == null) return false;
         return trustedPlayers.contains(player.getUniqueId().toString());
     }
 
-    private boolean isPlayerOwner(Player player, Chest chest)
+    private boolean isPlayerOwner(Player player, TileState state)
     {
-        String owner = getOwner(chest);
+        String owner = getOwner(state);
         if (owner == null) return false;
         UUID ownerUUID = UUID.fromString(owner);
         return ownerUUID.equals(player.getUniqueId());
@@ -116,65 +116,89 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
 
     // Chest Locking/Unlocking
 
-    private void handleLocking(Player player, Chest chest)
+    private void handleLocking(Player player, TileState state)
     {
-        String owner = getOwner(chest);
+        String owner = getOwner(state);
         if (owner == null)
         {
-            handleAddLock(player, chest);
+            handleAddLock(player, state);
             return;
         }
-        handleRemoveLock(player, chest);
+        handleRemoveLock(player, state);
     }
 
-    private void handleAddLock(Player player, Chest chest)
+    private void handleAddLock(Player player, TileState state)
     {
-        String ownerUUID = getOwner(chest);
+        String ownerUUID = getOwner(state);
         if (ownerUUID == null)
         {
-            if (chest.getInventory().getHolder() instanceof DoubleChest doubleChest)
+            if (state.getType() == Material.CHEST && ((Chest) state).getInventory().getHolder() instanceof DoubleChest doubleChest)
             {
                 setOwnership(player, (Chest) doubleChest.getLeftSide());
                 setOwnership(player, (Chest) doubleChest.getRightSide());
             }
             else
             {
-                setOwnership(player, chest);
+                setOwnership(player, state);
             }
-            player.sendMessage(ChatColor.GREEN + "Locking chest.");
+            player.sendMessage(ChatColor.GREEN + "Locking " + getContainerType(state).toLowerCase() + ".");
             return;
         }
-        if (!isPlayerOwner(player, chest))
+        if (!isPlayerOwner(player, state))
         {
-            player.sendMessage(ChatColor.RED + "You cannot lock this chest, it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
+            player.sendMessage(ChatColor.RED + "You cannot lock this " + getContainerType(state).toLowerCase() + ", it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
             return;
         }
-        player.sendMessage(ChatColor.RED + "This chest is already locked by you.");
+        player.sendMessage(ChatColor.RED + "This " + getContainerType(state).toLowerCase() + " is already locked by you.");
     }
 
-    private void handleRemoveLock(Player player, Chest chest)
+    private void handleRemoveLock(Player player, TileState state)
     {
-        String ownerUUID = getOwner(chest);
+        String ownerUUID = getOwner(state);
         if (ownerUUID == null)
         {
-            player.sendMessage(ChatColor.RED + "This chest is not locked.");
+            player.sendMessage(ChatColor.RED + "This " + getContainerType(state).toLowerCase() + " is not locked.");
             return;
         }
-        if (!isPlayerOwner(player, chest) && !player.isOp())
+        if (!isPlayerOwner(player, state) && !player.isOp())
         {
-            player.sendMessage(ChatColor.RED + "You cannot unlock this chest, it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
+            player.sendMessage(ChatColor.RED + "You cannot unlock this " + getContainerType(state).toLowerCase() + ", it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
             return;
         }
-        if (chest.getInventory().getHolder() instanceof DoubleChest doubleChest)
+        if (state.getType() == Material.CHEST && ((Chest) state).getInventory().getHolder() instanceof DoubleChest doubleChest)
         {
             removeOwnership((Chest) doubleChest.getLeftSide());
             removeOwnership((Chest) doubleChest.getRightSide());
         }
         else
         {
-            removeOwnership(chest);
+            removeOwnership(state);
         }
-        player.sendMessage(ChatColor.GREEN + "Unlocking chest.");
+        player.sendMessage(ChatColor.GREEN + "Unlocking " + getContainerType(state).toLowerCase() + ".");
+    }
+
+    // Block Checking methods
+
+    public static boolean isChest(Block block)
+    {
+        return block.getType() == Material.CHEST || block.getType() == Material.TRAPPED_CHEST || block.getType() == Material.BARREL;
+    }
+
+    private String getContainerType(TileState state)
+    {
+        if (state.getType() == Material.CHEST)
+        {
+            return "Chest";
+        }
+        else if (state.getType() == Material.TRAPPED_CHEST)
+        {
+            return "Trapped Chest";
+        }
+        else if (state.getType() == Material.BARREL)
+        {
+            return "Barrel";
+        }
+        return "Unknown";
     }
 
     // Event handling methods
@@ -201,15 +225,15 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
     public void onBlockBreak(BlockBreakEvent event)
     {
         Block block = event.getBlock();
-        if (block.getType() != Material.CHEST) return;
-        Chest chest = (Chest) block.getState();
-        String owner = getOwner(chest);
+        if (!isChest(block)) return;
+        TileState state = (TileState) block.getState();
+        String owner = getOwner(state);
         if (owner == null) return;
         Player player = event.getPlayer();
         UUID ownerUUID = UUID.fromString(owner);
         if (!ownerUUID.equals(player.getUniqueId()))
         {
-            player.sendMessage(ChatColor.RED + "You cannot break this chest, it is locked by " + Bukkit.getOfflinePlayer(ownerUUID).getName());
+            player.sendMessage(ChatColor.RED + "You cannot break this " + getContainerType(state).toLowerCase() + ", it is locked by " + Bukkit.getOfflinePlayer(ownerUUID).getName());
             event.setCancelled(true);
         }
     }
@@ -220,7 +244,7 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         Location location = event.getSource().getLocation();
         if (location == null) return;
         Block sourceBlock = location.getBlock();
-        if (sourceBlock.getType() != Material.CHEST) return;
+        if (!isChest(sourceBlock)) return;
         Chest chest = (Chest) sourceBlock.getState();
         if (getOwner(chest) != null)
         {
@@ -234,24 +258,24 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
         if (event.getHand() != EquipmentSlot.HAND) return;
         Block block = event.getClickedBlock();
         if (block == null) return;
-        if (block.getType() != Material.CHEST) return;
+        if (!isChest(block)) return;
         Player player = event.getPlayer();
-        Chest chest = (Chest) block.getState();
-        handleChestInteraction(player, chest, event);
+        TileState state = (TileState) block.getState();
+        handleChestInteraction(player, state, event);
     }
 
-    private void handleChestInteraction(Player player, Chest chest, PlayerInteractEvent event)
+    private void handleChestInteraction(Player player, TileState state, PlayerInteractEvent event)
     {
-        String owner = getOwner(chest);
+        String owner = getOwner(state);
         if (isUsingKey(player))
         {
-            handleLocking(player, chest);
+            handleLocking(player, state);
             return;
         }
         if (owner == null) return;
-        if (canPlayerOpen(player, chest)) return;
+        if (canPlayerOpen(player, state)) return;
         UUID ownerUUID = UUID.fromString(owner);
-        player.sendMessage(ChatColor.RED + "You cannot open this chest, it is locked by " + Bukkit.getOfflinePlayer(ownerUUID).getName());
+        player.sendMessage(ChatColor.RED + "You cannot open this " + getContainerType(state).toLowerCase() + ", it is locked by " + Bukkit.getOfflinePlayer(ownerUUID).getName());
         event.setCancelled(true);
     }
 
@@ -278,43 +302,43 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
             return false;
         }
         Block block = player.getTargetBlockExact(5);
-        if (block == null || block.getType() != Material.CHEST)
+        if (block == null || !isChest(block))
         {
-            player.sendMessage(ChatColor.RED + "You must be looking at a chest.");
+            player.sendMessage(ChatColor.RED + "You must be looking at a container.");
             return true;
         }
-        Chest chest = (Chest) block.getState();
-        String owner = getOwner(chest);
+        TileState state = (TileState) block.getState();
+        String owner = getOwner(state);
         if (owner == null)
         {
-            player.sendMessage(ChatColor.RED + "This chest is not locked.");
+            player.sendMessage(ChatColor.RED + "This " + getContainerType(state).toLowerCase() + " is not locked.");
             return true;
         }
-        if (!isPlayerOwner(player, chest))
+        if (!isPlayerOwner(player, state))
         {
-            player.sendMessage(ChatColor.RED + "You cannot trust players to this chest, it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(owner)).getName());
+            player.sendMessage(ChatColor.RED + "You cannot trust players to this " + getContainerType(state).toLowerCase() + ", it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(owner)).getName());
             return true;
         }
-        if (isPlayerOwner(trustedPlayer, chest))
+        if (isPlayerOwner(trustedPlayer, state))
         {
-            player.sendMessage(ChatColor.RED + "You cannot trust yourself to your own chest.");
+            player.sendMessage(ChatColor.RED + "You cannot trust yourself to your own " + getContainerType(state).toLowerCase() + ".");
             return true;
         }
-        if (isPlayerTrusted(trustedPlayer, chest))
+        if (isPlayerTrusted(trustedPlayer, state))
         {
-            player.sendMessage(ChatColor.RED + playerName + " is already trusted to this chest.");
+            player.sendMessage(ChatColor.RED + playerName + " is already trusted to this " + getContainerType(state).toLowerCase() + ".");
             return true;
         }
-        if (chest.getInventory().getHolder() instanceof DoubleChest doubleChest)
+        if (state.getType() == Material.CHEST && ((Chest) state).getInventory().getHolder() instanceof DoubleChest doubleChest)
         {
             addTrustedPlayer(trustedPlayer, (Chest) doubleChest.getLeftSide());
             addTrustedPlayer(trustedPlayer, (Chest) doubleChest.getRightSide());
         }
         else
         {
-            addTrustedPlayer(trustedPlayer, chest);
+            addTrustedPlayer(trustedPlayer, state);
         }
-        player.sendMessage(ChatColor.GREEN + "Trusted " + playerName + " to this chest.");
+        player.sendMessage(ChatColor.GREEN + "Trusted " + playerName + " to this " + getContainerType(state).toLowerCase() + ".");
         return true;
     }
 
@@ -328,18 +352,18 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
             return false;
         }
         Block block = player.getTargetBlockExact(5);
-        if (block == null || block.getType() != Material.CHEST)
+        if (block == null || !isChest(block))
         {
-            player.sendMessage(ChatColor.RED + "You must be looking at a chest.");
+            player.sendMessage(ChatColor.RED + "You must be looking at a container.");
             return true;
         }
-        Chest chest = (Chest) block.getState();
+        TileState state = (TileState) block.getState();
         if (action.equals("add"))
         {
-            handleAddLock(player, chest);
+            handleAddLock(player, state);
             return true;
         }
-        handleRemoveLock(player, chest);
+        handleRemoveLock(player, state);
         return true;
     }
 
@@ -347,24 +371,24 @@ public class ChestOwnershipListener implements Listener, CommandExecutor
     {
         if (args.length != 0) return false;
         Block block = player.getTargetBlockExact(5);
-        if (block == null || block.getType() != Material.CHEST)
+        if (block == null || !isChest(block))
         {
-            player.sendMessage(ChatColor.RED + "You must be looking at a chest.");
+            player.sendMessage(ChatColor.RED + "You must be looking at a container.");
             return true;
         }
-        Chest chest = (Chest) block.getState();
-        String owner = getOwner(chest);
+        TileState state = (TileState) block.getState();
+        String owner = getOwner(state);
         if (owner == null)
         {
-            player.sendMessage(ChatColor.RED + "This chest is not locked.");
+            player.sendMessage(ChatColor.RED + "This " + getContainerType(state).toLowerCase() + " is not locked.");
             return true;
         }
-        Location chestLocation = chest.getLocation();
-        player.sendMessage(ChatColor.BLUE + "Chest info of chest at " + chestLocation.getX() + ", " + chestLocation.getY() + ", " + chestLocation.getZ() + " " + chestLocation.getWorld().getName() + ":");
+        Location chestLocation = state.getLocation();
+        player.sendMessage(ChatColor.BLUE + "Container info of container at " + chestLocation.getX() + ", " + chestLocation.getY() + ", " + chestLocation.getZ() + " " + chestLocation.getWorld().getName() + ":");
         player.sendMessage(ChatColor.YELLOW + "Owner:");
         player.sendMessage(Bukkit.getOfflinePlayer(UUID.fromString(owner)).getName());
         player.sendMessage(ChatColor.YELLOW + "Trusted players:");
-        List<String> trustedPlayers = getTrustedPlayers(chest);
+        List<String> trustedPlayers = getTrustedPlayers(state);
         if (trustedPlayers == null)
         {
             player.sendMessage("No trusted players.");

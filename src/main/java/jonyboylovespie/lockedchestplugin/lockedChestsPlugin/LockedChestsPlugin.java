@@ -7,7 +7,7 @@ public class LockedChestsPlugin extends JavaPlugin
     public void onEnable()
     {
         getServer().getPluginManager().registerEvents(new ExplosionListener(), this);
-        getServer().getPluginManager().registerEvents(new ChestOwnershipListener(this), this);
+        getServer().getPluginManager().registerEvents(new BlockSecurityListener(this), this);
         getServer().getPluginManager().registerEvents(new AnvilRenameListener(), this);
     }
 }
