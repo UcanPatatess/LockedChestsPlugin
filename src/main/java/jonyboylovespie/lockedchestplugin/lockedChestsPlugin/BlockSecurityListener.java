@@ -304,8 +304,21 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         Player trustedPlayer = Bukkit.getPlayer(playerName);
         if (trustedPlayer == null)
         {
-            player.sendMessage(ChatColor.RED + playerName + " is not online.");
-            return false;
+            try
+            {
+                UUID playerUUID = UUIDFetcher.getUUID(playerName);
+                if (playerUUID == null)
+                {
+                    player.sendMessage(ChatColor.RED + "Player " + playerName + " does not exist.");
+                    return false;
+                }
+                trustedPlayer = Bukkit.getPlayer(playerUUID);
+            }
+            catch (Exception e)
+            {
+                player.sendMessage(ChatColor.RED + "Player " + playerName + " does not exist.");
+                return false;
+            }
         }
         Block block = player.getTargetBlockExact(5);
         if (block == null || !isChest(block))
