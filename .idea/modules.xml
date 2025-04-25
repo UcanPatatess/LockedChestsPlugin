@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/LockedChestsPlugin.iml" filepath="$PROJECT_DIR$/LockedChestsPlugin.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/LockedChestsPlugin.iml" filepath="$PROJECT_DIR$/.idea/LockedChestsPlugin.iml" />
     </modules>
   </component>
 </project>
