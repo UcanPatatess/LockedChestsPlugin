@@ -73,9 +73,9 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         return state.getPersistentDataContainer().get(ownerKey, PersistentDataType.STRING);
     }
 
-    private void addTrustedPlayer(Player trustedPlayer, TileState state)
+    private void addTrustedPlayer(UUID trustedPlayer, TileState state)
     {
-        addTrustedPlayer(trustedPlayer.getUniqueId().toString(), state);
+        addTrustedPlayer(trustedPlayer.toString(), state);
     }
 
     private void addTrustedPlayer(String trustedPlayer, TileState state)
@@ -103,21 +103,21 @@ public class BlockSecurityListener implements Listener, CommandExecutor
 
     private boolean canPlayerOpen(Player player, TileState state)
     {
-        return isPlayerOwner(player, state) || isPlayerTrusted(player, state);
+        return isPlayerOwner(player.getUniqueId(), state) || isPlayerTrusted(player.getUniqueId(), state);
     }
 
-    private boolean isPlayerTrusted(Player player, TileState state)
+    private boolean isPlayerTrusted(UUID playerUUID, TileState state)
     {
-        String uuid = player.getUniqueId().toString();
+        String uuid = playerUUID.toString();
         return state.getPersistentDataContainer().has(trustedKeyFor(uuid), PersistentDataType.BYTE);
     }
 
-    private boolean isPlayerOwner(Player player, TileState state)
+    private boolean isPlayerOwner(UUID playerUUID, TileState state)
     {
         String owner = getOwner(state);
         if (owner == null) return false;
         UUID ownerUUID = UUID.fromString(owner);
-        return ownerUUID.equals(player.getUniqueId());
+        return ownerUUID.equals(playerUUID);
     }
 
     // Chest Locking/Unlocking
@@ -150,7 +150,7 @@ public class BlockSecurityListener implements Listener, CommandExecutor
             player.sendMessage(ChatColor.GREEN + "Locking " + getContainerType(state).toLowerCase() + ".");
             return;
         }
-        if (!isPlayerOwner(player, state))
+        if (!isPlayerOwner(player.getUniqueId(), state))
         {
             player.sendMessage(ChatColor.RED + "You cannot lock this " + getContainerType(state).toLowerCase() + ", it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
             return;
@@ -166,7 +166,7 @@ public class BlockSecurityListener implements Listener, CommandExecutor
             player.sendMessage(ChatColor.RED + "This " + getContainerType(state).toLowerCase() + " is not locked.");
             return;
         }
-        if (!isPlayerOwner(player, state) && !player.isOp())
+        if (!isPlayerOwner(player.getUniqueId(), state) && !player.isOp())
         {
             player.sendMessage(ChatColor.RED + "You cannot unlock this " + getContainerType(state).toLowerCase() + ", it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
             return;
@@ -302,6 +302,7 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         if (args.length != 1) return false;
         String playerName = args[0];
         Player trustedPlayer = Bukkit.getPlayer(playerName);
+        UUID trustedPlayerUUID = null;
         if (trustedPlayer == null)
         {
             try
@@ -312,13 +313,17 @@ public class BlockSecurityListener implements Listener, CommandExecutor
                     player.sendMessage(ChatColor.RED + "Player " + playerName + " does not exist.");
                     return false;
                 }
-                trustedPlayer = Bukkit.getPlayer(playerUUID);
+                trustedPlayerUUID = playerUUID;
             }
             catch (Exception e)
             {
                 player.sendMessage(ChatColor.RED + "Player " + playerName + " does not exist.");
                 return false;
             }
+        }
+        else
+        {
+            trustedPlayerUUID = trustedPlayer.getUniqueId();
         }
         Block block = player.getTargetBlockExact(5);
         if (block == null || !isChest(block))
@@ -333,29 +338,29 @@ public class BlockSecurityListener implements Listener, CommandExecutor
             player.sendMessage(ChatColor.RED + "This " + getContainerType(state).toLowerCase() + " is not locked.");
             return true;
         }
-        if (!isPlayerOwner(player, state))
+        if (!isPlayerOwner(player.getUniqueId(), state))
         {
             player.sendMessage(ChatColor.RED + "You cannot trust players to this " + getContainerType(state).toLowerCase() + ", it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(owner)).getName());
             return true;
         }
-        if (isPlayerOwner(trustedPlayer, state))
+        if (isPlayerOwner(trustedPlayerUUID, state))
         {
             player.sendMessage(ChatColor.RED + "You cannot trust yourself to your own " + getContainerType(state).toLowerCase() + ".");
             return true;
         }
-        if (isPlayerTrusted(trustedPlayer, state))
+        if (isPlayerTrusted(trustedPlayerUUID, state))
         {
             player.sendMessage(ChatColor.RED + playerName + " is already trusted to this " + getContainerType(state).toLowerCase() + ".");
             return true;
         }
         if (state.getType() == Material.CHEST && ((Chest) state).getInventory().getHolder() instanceof DoubleChest doubleChest)
         {
-            addTrustedPlayer(trustedPlayer, (Chest) doubleChest.getLeftSide());
-            addTrustedPlayer(trustedPlayer, (Chest) doubleChest.getRightSide());
+            addTrustedPlayer(trustedPlayerUUID, (Chest) doubleChest.getLeftSide());
+            addTrustedPlayer(trustedPlayerUUID, (Chest) doubleChest.getRightSide());
         }
         else
         {
-            addTrustedPlayer(trustedPlayer, state);
+            addTrustedPlayer(trustedPlayerUUID, state);
         }
         player.sendMessage(ChatColor.GREEN + "Trusted " + playerName + " to this " + getContainerType(state).toLowerCase() + ".");
         return true;
