@@ -27,12 +27,13 @@ public class BlockSecurityListener implements Listener, CommandExecutor
 {
     private JavaPlugin plugin;
     private NamespacedKey ownerKey;
-    private final NamespacedKey trustedKey = new NamespacedKey(plugin, "trusted");
+    private NamespacedKey trustedKey;
 
     public BlockSecurityListener(JavaPlugin plugin)
     {
         this.plugin = plugin;
         ownerKey = new NamespacedKey(plugin, "owner");
+        trustedKey = new NamespacedKey(plugin, "trusted");
         this.plugin.getCommand("trust").setExecutor(this);
         this.plugin.getCommand("lockchest").setExecutor(this);
         this.plugin.getCommand("lockinspect").setExecutor(this);
