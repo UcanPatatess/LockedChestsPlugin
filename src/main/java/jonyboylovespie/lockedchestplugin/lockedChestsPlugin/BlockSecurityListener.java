@@ -18,9 +18,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.OfflinePlayer;
-
-import java.nio.ByteBuffer;
 import java.util.*;
 
 public class BlockSecurityListener implements Listener, CommandExecutor
@@ -37,33 +34,6 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         this.plugin.getCommand("trust").setExecutor(this);
         this.plugin.getCommand("lockchest").setExecutor(this);
         this.plugin.getCommand("lockinspect").setExecutor(this);
-    }
-
-    // Serialization methods
-
-    private byte[] serializeTrusted(Set<UUID> uuids)
-    {
-        ByteBuffer buf = ByteBuffer.allocate(4 + uuids.size() * 16);
-        buf.putInt(uuids.size());
-        for (UUID id : uuids)
-        {
-            buf.putLong(id.getMostSignificantBits());
-            buf.putLong(id.getLeastSignificantBits());
-        }
-        return buf.array();
-    }
-
-    private Set<UUID> deserializeTrusted(byte[] data)
-    {
-        if (data == null || data.length < 4) return new HashSet<>();
-        ByteBuffer buf = ByteBuffer.wrap(data);
-        int count = buf.getInt();
-        Set<UUID> result = new HashSet<>(count);
-        for (int i = 0; i < count; i++)
-        {
-            result.add(new UUID(buf.getLong(), buf.getLong()));
-        }
-        return result;
     }
 
     // Data management methods
@@ -91,36 +61,30 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         return state.getPersistentDataContainer().get(ownerKey, PersistentDataType.STRING);
     }
 
-    private void addTrustedPlayer(String trustedPlayer, TileState state)
-    {
-        addTrustedPlayer(UUID.fromString(trustedPlayer), state);
-    }
-
     private void addTrustedPlayer(UUID trustedPlayer, TileState state)
     {
+        UuidSetDataType type = new UuidSetDataType();
         Set<UUID> trusted = getTrustedPlayers(state);
-        if (trusted.add(trustedPlayer)) saveTrustedPlayers(trusted, state);
-    }
-
-    private void removeTrustedPlayer(UUID uuid, TileState state)
-    {
-        Set<UUID> trusted = getTrustedPlayers(state);
-        if (trusted.remove(uuid)) saveTrustedPlayers(trusted, state);
+        trusted.add(trustedPlayer);
+        state.getPersistentDataContainer().set(trustedKey, type, trusted);
+        state.update();
     }
 
     private Set<UUID> getTrustedPlayers(TileState state)
     {
-        byte[] raw = state.getPersistentDataContainer().get(trustedKey, PersistentDataType.BYTE_ARRAY);
-        return deserializeTrusted(raw);
+        UuidSetDataType type = new UuidSetDataType();
+        var container = state.getPersistentDataContainer();
+        try
+        {
+            return container.get(trustedKey, type);
+        }
+        catch (ClassCastException | IllegalArgumentException ex)
+        {
+            container.remove(trustedKey);
+            state.update();
+            return new HashSet<>();
+        }
     }
-
-    private void saveTrustedPlayers(Set<UUID> uuids, TileState state)
-    {
-        state.getPersistentDataContainer().set(trustedKey, PersistentDataType.BYTE_ARRAY, serializeTrusted(uuids));
-        state.update();
-    }
-
-    // Permission checking methods
 
     private boolean canPlayerOpen(Player player, TileState state)
     {
