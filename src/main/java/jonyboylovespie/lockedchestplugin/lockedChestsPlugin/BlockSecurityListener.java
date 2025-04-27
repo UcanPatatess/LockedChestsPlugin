@@ -27,10 +27,7 @@ public class BlockSecurityListener implements Listener, CommandExecutor
 {
     private JavaPlugin plugin;
     private NamespacedKey ownerKey;
-    private NamespacedKey trustedKeyFor(String uuid)
-    {
-        return new NamespacedKey(plugin, "trusted_" + uuid);
-    }
+    private final NamespacedKey trustedKey = new NamespacedKey(plugin, "trusted");
 
     public BlockSecurityListener(JavaPlugin plugin)
     {
@@ -41,19 +38,39 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         this.plugin.getCommand("lockinspect").setExecutor(this);
     }
 
+    // Serialization methods
+
+    private byte[] serializeTrusted(Set<UUID> uuids)
+    {
+        ByteBuffer buf = ByteBuffer.allocate(4 + uuids.size() * 16);
+        buf.putInt(uuids.size());
+        for (UUID id : uuids)
+        {
+            buf.putLong(id.getMostSignificantBits());
+            buf.putLong(id.getLeastSignificantBits());
+        }
+        return buf.array();
+    }
+
+    private Set<UUID> deserializeTrusted(byte[] data)
+    {
+        if (data == null || data.length < 4) return new HashSet<>();
+        ByteBuffer buf = ByteBuffer.wrap(data);
+        int count = buf.getInt();
+        Set<UUID> result = new HashSet<>(count);
+        for (int i = 0; i < count; i++)
+        {
+            result.add(new UUID(buf.getLong(), buf.getLong()));
+        }
+        return result;
+    }
+
     // Data management methods
 
     private void removeOwnership(TileState state)
     {
         state.getPersistentDataContainer().remove(ownerKey);
-        HashSet<String> trustedPlayers = getTrustedPlayers(state);
-        if (trustedPlayers != null)
-        {
-            for (String trustedPlayer : trustedPlayers)
-            {
-                state.getPersistentDataContainer().remove(trustedKeyFor(trustedPlayer));
-            }
-        }
+        state.getPersistentDataContainer().remove(trustedKey);
         state.update();
     }
 
@@ -73,30 +90,33 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         return state.getPersistentDataContainer().get(ownerKey, PersistentDataType.STRING);
     }
 
-    private void addTrustedPlayer(UUID trustedPlayer, TileState state)
-    {
-        addTrustedPlayer(trustedPlayer.toString(), state);
-    }
-
     private void addTrustedPlayer(String trustedPlayer, TileState state)
     {
-        state.getPersistentDataContainer().set(trustedKeyFor(trustedPlayer), PersistentDataType.BYTE, (byte)1);
-        state.update();
+        addTrustedPlayer(UUID.fromString(trustedPlayer), state);
     }
 
-    private HashSet<String> getTrustedPlayers(TileState state)
+    private void addTrustedPlayer(UUID trustedPlayer, TileState state)
     {
-        HashSet<String> trusted = new HashSet<>();
-        for (NamespacedKey key : state.getPersistentDataContainer().getKeys()) {
-            if (key.getKey().startsWith("trusted_")) {
-                byte[] data = state.getPersistentDataContainer().get(key, PersistentDataType.BYTE_ARRAY);
-                if (data != null)
-                {
-                    trusted.add(key.getKey().substring("trusted_".length()));
-                }
-            }
-        }
-        return trusted.isEmpty() ? null : trusted;
+        Set<UUID> trusted = getTrustedPlayers(state);
+        if (trusted.add(trustedPlayer)) saveTrustedPlayers(trusted, state);
+    }
+
+    private void removeTrustedPlayer(UUID uuid, TileState state)
+    {
+        Set<UUID> trusted = getTrustedPlayers(state);
+        if (trusted.remove(uuid)) saveTrustedPlayers(trusted, state);
+    }
+
+    private Set<UUID> getTrustedPlayers(TileState state)
+    {
+        byte[] raw = state.getPersistentDataContainer().get(trustedKey, PersistentDataType.BYTE_ARRAY);
+        return deserializeTrusted(raw);
+    }
+
+    private void saveTrustedPlayers(Set<UUID> uuids, TileState state)
+    {
+        state.getPersistentDataContainer().set(trustedKey, PersistentDataType.BYTE_ARRAY, serializeTrusted(uuids));
+        state.update();
     }
 
     // Permission checking methods
@@ -106,10 +126,9 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         return isPlayerOwner(player.getUniqueId(), state) || isPlayerTrusted(player.getUniqueId(), state);
     }
 
-    private boolean isPlayerTrusted(UUID playerUUID, TileState state)
+    private boolean isPlayerTrusted(UUID uuid, TileState state)
     {
-        String uuid = playerUUID.toString();
-        return state.getPersistentDataContainer().has(trustedKeyFor(uuid), PersistentDataType.BYTE);
+        return getTrustedPlayers(state).contains(uuid);
     }
 
     private boolean isPlayerOwner(UUID playerUUID, TileState state)
@@ -218,11 +237,11 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         if (chest.getInventory().getHolder() instanceof DoubleChest doubleChest)
         {
             String owner = getOwner(chest);
-            Chest newChest = (Chest) (chest.equals(doubleChest.getRightSide()) ? doubleChest.getLeftSide() : doubleChest.getRightSide());
             if (owner == null) return;
+            Chest newChest = (Chest) (chest.equals(doubleChest.getRightSide()) ? doubleChest.getLeftSide() : doubleChest.getRightSide());
             setOwnership(owner, newChest);
-            HashSet<String> trustedPlayers = getTrustedPlayers(chest);
-            if (trustedPlayers == null) return;
+            Set<UUID> trustedPlayers = getTrustedPlayers(chest);
+            if (trustedPlayers.isEmpty()) return;
             trustedPlayers.forEach(trustedPlayer -> addTrustedPlayer(trustedPlayer, newChest));
         }
     }
@@ -412,15 +431,15 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         player.sendMessage(ChatColor.YELLOW + "Owner:");
         player.sendMessage(Bukkit.getOfflinePlayer(UUID.fromString(owner)).getName());
         player.sendMessage(ChatColor.YELLOW + "Trusted players:");
-        HashSet<String> trustedPlayers = getTrustedPlayers(state);
-        if (trustedPlayers == null)
+        Set<UUID> trustedPlayers = getTrustedPlayers(state);
+        if (trustedPlayers.isEmpty())
         {
             player.sendMessage("No trusted players.");
             return true;
         }
-        for (String trustedPlayer : trustedPlayers)
+        for (UUID trustedPlayer : trustedPlayers)
         {
-            player.sendMessage(Bukkit.getOfflinePlayer(UUID.fromString(trustedPlayer)).getName());
+            player.sendMessage(Bukkit.getOfflinePlayer(trustedPlayer).getName());
         }
         return true;
     }
