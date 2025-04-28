@@ -93,6 +93,8 @@ public class BlockSecurityListener implements Listener, CommandExecutor
 
     private boolean isPlayerTrusted(UUID uuid, TileState state)
     {
+        Set<UUID> trustedPlayers = getTrustedPlayers(state);
+        if (trustedPlayers == null) return false;
         return getTrustedPlayers(state).contains(uuid);
     }
 
@@ -206,7 +208,7 @@ public class BlockSecurityListener implements Listener, CommandExecutor
             Chest newChest = (Chest) (chest.equals(doubleChest.getRightSide()) ? doubleChest.getLeftSide() : doubleChest.getRightSide());
             setOwnership(owner, newChest);
             Set<UUID> trustedPlayers = getTrustedPlayers(chest);
-            if (trustedPlayers.isEmpty()) return;
+            if (trustedPlayers == null || trustedPlayers.isEmpty()) return;
             trustedPlayers.forEach(trustedPlayer -> addTrustedPlayer(trustedPlayer, newChest));
         }
     }
@@ -235,7 +237,7 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         if (location == null) return;
         Block sourceBlock = location.getBlock();
         if (!isChest(sourceBlock)) return;
-        Chest chest = (Chest) sourceBlock.getState();
+        TileState chest = (TileState) sourceBlock.getState();
         if (getOwner(chest) != null)
         {
             event.setCancelled(true);
@@ -397,7 +399,7 @@ public class BlockSecurityListener implements Listener, CommandExecutor
         player.sendMessage(Bukkit.getOfflinePlayer(UUID.fromString(owner)).getName());
         player.sendMessage(ChatColor.YELLOW + "Trusted players:");
         Set<UUID> trustedPlayers = getTrustedPlayers(state);
-        if (trustedPlayers.isEmpty())
+        if (trustedPlayers == null || trustedPlayers.isEmpty())
         {
             player.sendMessage("No trusted players.");
             return true;
