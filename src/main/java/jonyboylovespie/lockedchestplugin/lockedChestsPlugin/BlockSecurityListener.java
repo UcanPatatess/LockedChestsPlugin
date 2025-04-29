@@ -65,6 +65,10 @@ public class BlockSecurityListener implements Listener, CommandExecutor
     {
         UuidSetDataType type = new UuidSetDataType();
         Set<UUID> trusted = getTrustedPlayers(state);
+        if (trusted == null)
+        {
+            trusted = new HashSet<>();
+        }
         trusted.add(trustedPlayer);
         state.getPersistentDataContainer().set(trustedKey, type, trusted);
         state.update();
