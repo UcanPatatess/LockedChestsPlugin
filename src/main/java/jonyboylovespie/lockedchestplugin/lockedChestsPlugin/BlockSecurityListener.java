@@ -22,6 +22,8 @@ import java.util.*;
 
 public class BlockSecurityListener implements Listener, CommandExecutor
 {
+    private static final String BYPASS_PERMISSION = "lockedchests.admin.bypass";
+
     private JavaPlugin plugin;
     private NamespacedKey ownerKey;
     private NamespacedKey trustedKey;
@@ -92,7 +94,12 @@ public class BlockSecurityListener implements Listener, CommandExecutor
 
     private boolean canPlayerOpen(Player player, TileState state)
     {
-        return isPlayerOwner(player.getUniqueId(), state) || isPlayerTrusted(player.getUniqueId(), state);
+        return hasBypassPermission(player) || isPlayerOwner(player.getUniqueId(), state) || isPlayerTrusted(player.getUniqueId(), state);
+    }
+
+    private boolean hasBypassPermission(Player player)
+    {
+        return player.hasPermission(BYPASS_PERMISSION);
     }
 
     private boolean isPlayerTrusted(UUID uuid, TileState state)
@@ -156,7 +163,7 @@ public class BlockSecurityListener implements Listener, CommandExecutor
             player.sendMessage(ChatColor.RED + "This " + getContainerType(state).toLowerCase() + " is not locked.");
             return;
         }
-        if (!isPlayerOwner(player.getUniqueId(), state) && !player.isOp())
+        if (!isPlayerOwner(player.getUniqueId(), state) && !hasBypassPermission(player))
         {
             player.sendMessage(ChatColor.RED + "You cannot unlock this " + getContainerType(state).toLowerCase() + ", it is locked by " + Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName());
             return;
